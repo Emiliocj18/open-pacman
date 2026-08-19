@@ -12,6 +12,8 @@ const OPPOSITE = { left: 'right', right: 'left', up: 'down', down: 'up' };
 
 const PACMAN_SPEED = 0.125; // 1/8 celda/frame -> alinea cada 8 frames
 const GHOST_SPEED = 0.1;    // 1/10 celda/frame
+const POWER_DURATION = 360; // 6 s a ~60fps
+const POWER_SPEED = 0.05;   // mitad de GHOST_SPEED
 
 // Personalidad por tipo: esquina de scatter y frames hasta su liberacion.
 const GHOST_KINDS = {
@@ -35,9 +37,11 @@ function createGame() {
   const grid = MAZE.map( ( row ) => row.slice() );
   // La celda de inicio de Pacman arranca sin dot.
   grid[ PACMAN_START.y ][ PACMAN_START.x ] = 0;
+  // Las power pellets sustituyen al dot en esas celdas (valor 4).
+  for ( const p of POWER_PELLETS ) grid[ p.y ][ p.x ] = 4;
 
   let dots = 0;
-  for ( const row of grid ) for ( const v of row ) if ( v === 2 ) dots++;
+  for ( const row of grid ) for ( const v of row ) if ( v === 2 || v === 4 ) dots++;
 
   return {
     state: 'start',
@@ -65,6 +69,7 @@ function createGame() {
     mode: 'scatter',
     modeIndex: 0,
     modeFrames: 0,
+    powerFrames: 0,
   };
 }
 
@@ -116,11 +121,13 @@ function movePacman( game ) {
       p.dir = p.nextDir;
       p.nextDir = null;
     }
-    // Comer dot.
-    if ( grid[ p.y ][ p.x ] === 2 ) {
+    // Comer dot o power pellet.
+    const v = grid[ p.y ][ p.x ];
+    if ( v === 2 || v === 4 ) {
       grid[ p.y ][ p.x ] = 0;
-      game.score += 10;
+      game.score += v === 4 ? 50 : 10;
       game.dotsRemaining--;
+      if ( v === 4 ) game.powerFrames = POWER_DURATION;
     }
     // Si no puede seguir, se detiene en la celda.
     if ( !canMove( grid, p.x, p.y, p.dir, 'pacman' ) ) return;
@@ -172,6 +179,12 @@ function decideGhost( game, g ) {
   );
   // Sin salida (callejon): permitir el giro de 180.
   const choices = options.length ? options : [ '' + OPPOSITE[ g.dir ] ];
+
+  // Asustado: direccion aleatoria entre las posibles.
+  if ( game.powerFrames > 0 && g.released ) {
+    g.dir = choices[ Math.floor( Math.random() * choices.length ) ];
+    return;
+  }
 
   const target = ghostTarget( game, g );
   let best = choices[ 0 ];
@@ -242,8 +255,9 @@ function moveGhost( game, g ) {
   }
 
   const d = DIRS[ g.dir ];
-  g.x += d.x * g.speed;
-  g.y += d.y * g.speed;
+  const speed = game.powerFrames > 0 && g.released ? POWER_SPEED : g.speed;
+  g.x += d.x * speed;
+  g.y += d.y * speed;
   wrapTunnel( g, width );
 }
 
@@ -264,6 +278,19 @@ function resetPositions( game ) {
   game.mode = 'scatter';
   game.modeIndex = 0;
   game.modeFrames = 0;
+  game.powerFrames = 0;
+}
+
+// Fantasma comido: +200 y reinsertado en la pen con su cuenta atras.
+function eatGhost( game, g ) {
+  game.score += 200;
+  const start = GHOST_STARTS.find( ( s ) => s.kind === g.kind ) || GHOST_STARTS[ 0 ];
+  g.x = start.x;
+  g.y = start.y;
+  g.dir = 'up';
+  g.released = false;
+  g.leavingPen = false;
+  g.releaseFrames = GHOST_KINDS[ g.kind ].releaseFrames;
 }
 
 function collides( a, b ) {
@@ -286,16 +313,21 @@ function update( game ) {
   movePacman( game );
   game.ghosts.forEach( ( g ) => moveGhost( game, g ) );
 
+  if ( game.powerFrames > 0 ) game.powerFrames--;
+
   for ( const g of game.ghosts ) {
-    if ( collides( game.pacman, g ) ) {
-      game.lives--;
-      if ( game.lives <= 0 ) {
-        game.state = 'lost';
-        return;
-      }
-      resetPositions( game );
-      break;
+    if ( !collides( game.pacman, g ) ) continue;
+    if ( game.powerFrames > 0 && g.released ) {
+      eatGhost( game, g );
+      continue;
     }
+    game.lives--;
+    if ( game.lives <= 0 ) {
+      game.state = 'lost';
+      return;
+    }
+    resetPositions( game );
+    break;
   }
 
   if ( game.dotsRemaining <= 0 ) game.state = 'won';
