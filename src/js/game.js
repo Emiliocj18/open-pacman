@@ -189,10 +189,51 @@ function decideGhost( game, g ) {
   g.dir = best;
 }
 
+// Bobbing en la pen: oscila arriba/abajo entre las filas 13 y 15.
+function bobInPen( g ) {
+  if ( aligned( g.x ) && aligned( g.y ) ) {
+    g.x = Math.round( g.x );
+    g.y = Math.round( g.y );
+    if ( g.y <= 13 ) g.dir = 'down';
+    else if ( g.y >= 15 ) g.dir = 'up';
+  }
+  const d = DIRS[ g.dir ];
+  g.x += d.x * g.speed;
+  g.y += d.y * g.speed;
+}
+
 function moveGhost( game, g ) {
   const grid = game.grid;
   const width = grid[ 0 ].length;
 
+  // En la pen: cuenta atras de liberacion y bobbing entre filas 13-15.
+  if ( !g.released && !g.leavingPen ) {
+    if ( g.releaseFrames > 0 ) {
+      g.releaseFrames--;
+      if ( g.releaseFrames > 0 ) {
+        bobInPen( g );
+        return;
+      }
+    }
+    // Cuenta atras cumplida: empieza a salir por la puerta hacia arriba.
+    g.leavingPen = true;
+    g.dir = 'up';
+  }
+
+  // Saliendo de la pen: sube en linea recta hasta dejar la puerta atras.
+  if ( g.leavingPen ) {
+    g.dir = 'up';
+    g.y -= g.speed;
+    if ( aligned( g.y ) && g.y <= 11 ) {
+      g.y = Math.round( g.y );
+      g.leavingPen = false;
+      g.released = true;
+      g.dir = 'left';
+    }
+    return;
+  }
+
+  // Movimiento normal por el laberinto.
   if ( aligned( g.x ) && aligned( g.y ) ) {
     g.x = Math.round( g.x );
     g.y = Math.round( g.y );
