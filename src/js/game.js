@@ -13,6 +13,14 @@ const OPPOSITE = { left: 'right', right: 'left', up: 'down', down: 'up' };
 const PACMAN_SPEED = 0.125; // 1/8 celda/frame -> alinea cada 8 frames
 const GHOST_SPEED = 0.1;    // 1/10 celda/frame
 
+// Personalidad por tipo: esquina de scatter y frames hasta su liberacion.
+const GHOST_KINDS = {
+  blinky: { scatter: { x: 26, y: 1 }, releaseFrames: 0 },
+  pinky:  { scatter: { x: 1, y: 1 },  releaseFrames: 120 },
+  inky:   { scatter: { x: 26, y: 29 }, releaseFrames: 420 },
+  clyde:  { scatter: { x: 1, y: 29 }, releaseFrames: 900 },
+};
+
 // Crea una partida nueva. Copia MAZE (pristino) a game.grid para poder comer
 // dots sin destruir el original, y reiniciar.
 function createGame() {
@@ -42,7 +50,13 @@ function createGame() {
       dir: 'up',
       speed: GHOST_SPEED,
       kind: g.kind,
+      released: false,
+      leavingPen: false,
+      releaseFrames: GHOST_KINDS[ g.kind ].releaseFrames,
     } ) ),
+    mode: 'scatter',
+    modeIndex: 0,
+    modeFrames: 0,
   };
 }
 
@@ -168,7 +182,13 @@ function resetPositions( game ) {
     g.x = GHOST_STARTS[ i ].x;
     g.y = GHOST_STARTS[ i ].y;
     g.dir = 'up';
+    g.released = false;
+    g.leavingPen = false;
+    g.releaseFrames = GHOST_KINDS[ g.kind ].releaseFrames;
   } );
+  game.mode = 'scatter';
+  game.modeIndex = 0;
+  game.modeFrames = 0;
 }
 
 function collides( a, b ) {
