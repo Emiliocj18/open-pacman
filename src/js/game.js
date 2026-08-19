@@ -180,6 +180,12 @@ function decideGhost( game, g ) {
   // Sin salida (callejon): permitir el giro de 180.
   const choices = options.length ? options : [ '' + OPPOSITE[ g.dir ] ];
 
+  // Asustado: direccion aleatoria entre las posibles.
+  if ( game.powerFrames > 0 && g.released ) {
+    g.dir = choices[ Math.floor( Math.random() * choices.length ) ];
+    return;
+  }
+
   const target = ghostTarget( game, g );
   let best = choices[ 0 ];
   let bestDist = Infinity;
@@ -249,8 +255,9 @@ function moveGhost( game, g ) {
   }
 
   const d = DIRS[ g.dir ];
-  g.x += d.x * g.speed;
-  g.y += d.y * g.speed;
+  const speed = game.powerFrames > 0 && g.released ? POWER_SPEED : g.speed;
+  g.x += d.x * speed;
+  g.y += d.y * speed;
   wrapTunnel( g, width );
 }
 
