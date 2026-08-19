@@ -21,6 +21,14 @@ const GHOST_KINDS = {
   clyde:  { scatter: { x: 1, y: 29 }, releaseFrames: 900 },
 };
 
+// Ciclo global scatter/chase alternando; el ultimo chase es perpetuo.
+const MODE_CYCLE = [ // scatter/chase alternando; último chase perpetuo
+  { mode: 'scatter', frames: 420 }, { mode: 'chase', frames: 1200 },
+  { mode: 'scatter', frames: 420 }, { mode: 'chase', frames: 1200 },
+  { mode: 'scatter', frames: 300 }, { mode: 'chase', frames: 1200 },
+  { mode: 'scatter', frames: 300 }, { mode: 'chase', frames: Infinity },
+];
+
 // Crea una partida nueva. Copia MAZE (pristino) a game.grid para poder comer
 // dots sin destruir el original, y reiniciar.
 function createGame() {
@@ -195,7 +203,19 @@ function collides( a, b ) {
   return Math.abs( a.x - b.x ) < 0.5 && Math.abs( a.y - b.y ) < 0.5;
 }
 
+// Avanza el ciclo global de modos por frames acumulados.
+function advanceMode( game ) {
+  game.modeFrames++;
+  const segment = MODE_CYCLE[ game.modeIndex ];
+  if ( game.modeFrames >= segment.frames ) {
+    game.modeIndex = Math.min( game.modeIndex + 1, MODE_CYCLE.length - 1 );
+    game.mode = MODE_CYCLE[ game.modeIndex ].mode;
+    game.modeFrames = 0;
+  }
+}
+
 function update( game ) {
+  advanceMode( game );
   movePacman( game );
   game.ghosts.forEach( ( g ) => moveGhost( game, g ) );
 
